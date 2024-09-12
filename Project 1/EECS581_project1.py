@@ -5,10 +5,11 @@ MAX_SHIP = 5
 
 A_CHAR = 65
 
-ROWS = [str(i) for i in range(1, BOARD_SIZE+1)]  # Row labels: 1-10
+ROWS = [str(i) for i in range(1, BOARD_SIZE + 1)]  # Row labels: 1-10
 COLS = [chr(i) for i in range(A_CHAR, BOARD_SIZE + A_CHAR)]  # Column labels: A-J
 
 EMPTY = '.'
+SHIP = 'S'
 
 # Utility function to display a board
 def display(board):
@@ -16,28 +17,33 @@ def display(board):
     for i, row in enumerate(board):
         print(ROWS[i] + " " + " ".join(row))
 
-
 # Create an empty 10x10 board
 def create_board():
     return [[EMPTY for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
 
-
 # Convert letter and number to board coordinates
 def get_coordinates(pos):
     row = int(pos[1:]) - 1
-    col = ord(pos[0].upper()) - 65
+    col = ord(pos[0].upper()) - A_CHAR
     return row, col
 
-
-# Place ships
-def place_ship(board, size, orientation, start):
+# Place a ship on the board
+def place_ship(board, size, orientation, direction, start):
     row, col = get_coordinates(start)
-    if orientation == 'H':  # Horizontal
-        for i in range(size):
-            board[row][col + i] = "S"
-    else:  # Vertical
-        for i in range(size):
-            board[row + i][col] = "S"
+    if orientation == 'H':
+        if direction == 'H':
+            for i in range(size):
+                board[row][col + i] = SHIP
+        elif direction == 'L':
+            for i in range(size):
+                board[row][col - i] = SHIP
+    else:
+        if direction == 'D':
+            for i in range(size):
+                board[row + i][col] = SHIP
+        elif direction == 'U':
+            for i in range(size):
+                board[row - i][col] = SHIP
 
 # Check if position is valid for placing the ship
 def is_valid_position(pos):
@@ -55,22 +61,31 @@ def is_valid_position(pos):
         return True
 
 # Check if placing ship is valid
-def valid_ship_placement(board, size, orientation, start):
+def valid_ship_placement(board, size, orientation, direction, start):
     row, col = get_coordinates(start)
     if orientation == 'H':
-        if col + size > BOARD_SIZE:
-            return False
-        return all(board[row][col + i] == EMPTY for i in range(size))
+        if direction == 'H':
+            if col + size > BOARD_SIZE:
+                return False  # Ship goes off the board to the right
+            return all(board[row][col + i] == EMPTY for i in range(size))
+        elif direction == 'L':
+            if col - size + 1 < 0:
+                return False  # Ship goes off the board to the left
+            return all(board[row][col - i] == EMPTY for i in range(size))
     else:
-        if row + size > BOARD_SIZE:
-            return False
-        return all(board[row + i][col] == EMPTY for i in range(size))
-
+        if direction == 'D':
+            if row + size > BOARD_SIZE:
+                return False  # Ship goes off the board downwards
+            return all(board[row + i][col] == EMPTY for i in range(size))
+        elif direction == 'U':
+            if row - size + 1 < 0:
+                return False  # Ship goes off the board upwards
+            return all(board[row - i][col] == EMPTY for i in range(size))
 
 # Fire at opponent's board
 def fire(board, pos):
     row, col = get_coordinates(pos)
-    if board[row][col] == "S":
+    if board[row][col] == SHIP:
         board[row][col] = "X"  # Hit
         return True
     elif board[row][col] == EMPTY:
@@ -78,14 +93,12 @@ def fire(board, pos):
         return False
     return False  # Already fired at this position
 
-
 # Check if all ships are sunk
 def all_ships_sunk(board):
     for row in board:
-        if "S" in row:
+        if SHIP in row:
             return False
     return True
-
 
 # Ship configuration
 def ship_sizes(num_ships):
@@ -98,14 +111,27 @@ def place_ships(board, ship_list):
             display(board)
             start = input("Enter start position (e.g., A1): ")
             orientation = input("Enter orientation (H for horizontal, V for vertical): ").upper()
-            if not is_valid_position(start) or orientation not in ['H', 'V']:
+            direction = input("Enter direction (H for right, L for left, D for down, U for up): ").upper()
+            
+            if not is_valid_position(start) or orientation not in ['H', 'V'] or direction not in ['H', 'L', 'D', 'U']:
                 print("Invalid input. Try again.")
                 continue
-            if valid_ship_placement(board, ship, orientation, start):
-                place_ship(board, ship, orientation, start)
+            if valid_ship_placement(board, ship, orientation, direction, start):
+                place_ship(board, ship, orientation, direction, start)
                 break
             else:
                 print("Invalid placement. Try again.")
+
+def get_num_ships():
+    while True:
+        try:
+            num_ships = int(input(f"Enter number of ships per player (1 to {MAX_SHIP}): "))
+            if 1 <= num_ships <= MAX_SHIP:
+                return num_ships
+            else:
+                print(f"Please enter a number between 1 and {MAX_SHIP}.")
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
 
 def battleship_game():
     # Initialize player boards
@@ -120,9 +146,7 @@ def battleship_game():
     print("Welcome to Battleship!")
 
     # Get the number of ships
-    num_ships = int(input(f"Enter number of ships per player (1 to {MAX_SHIP}): "))
-    while num_ships < 1 or num_ships > MAX_SHIP:
-        num_ships = int(input(f"Please enter a valid number (1 to {MAX_SHIP}): "))
+    num_ships = get_num_ships()
 
     ship_list = ship_sizes(num_ships)
 
@@ -138,7 +162,10 @@ def battleship_game():
     while True:
         if player_turn == 1:
             print("\nPlayer 1's turn!")
-            display(player1_view)
+            print("Your board:")
+            display(player1_board)  # Show Player 1's board with their ships
+            print("Opponent's board:")
+            display(player1_view)  # Show Player 1's view of Player 2's board
             pos = input("Enter position to fire (e.g., A1): ")
             if fire(player2_board, pos):
                 print("Hit!")
@@ -152,7 +179,10 @@ def battleship_game():
             player_turn = 2
         else:
             print("\nPlayer 2's turn!")
-            display(player2_view)
+            print("Your board:")
+            display(player2_board)  # Show Player 2's board with their ships
+            print("Opponent's board:")
+            display(player2_view)  # Show Player 2's view of Player 1's board
             pos = input("Enter position to fire (e.g., A1): ")
             if fire(player1_board, pos):
                 print("Hit!")
@@ -164,6 +194,5 @@ def battleship_game():
                 print("Player 2 wins! All ships sunk.")
                 break
             player_turn = 1
-
 
 battleship_game()
